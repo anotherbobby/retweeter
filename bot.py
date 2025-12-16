@@ -1,6 +1,11 @@
 import tweepy
 import time
 import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Twitter API credentials
 API_KEY = os.getenv("API_KEY")
@@ -14,6 +19,24 @@ TARGET_ACCOUNT = os.getenv("TARGET_ACCOUNT")
 
 # File to store processed tweet IDs
 PROCESSED_FILE = "processed_tweets.json"
+
+def validate_credentials():
+    """Validate that all required environment variables are loaded"""
+    required_vars = ['API_KEY', 'API_SECRET', 'ACCESS_TOKEN', 'ACCESS_TOKEN_SECRET', 'BEARER_TOKEN', 'TARGET_ACCOUNT']
+    missing_vars = []
+    
+    for var in required_vars:
+        value = os.getenv(var)
+        if not value:
+            missing_vars.append(var)
+    
+    if missing_vars:
+        print(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
+        print("Please check your .env file and ensure all variables are set correctly.")
+        return False
+    
+    print("✅ All environment variables loaded successfully")
+    return True
 
 def load_processed_tweets():
     """Load the list of already processed tweet IDs"""
@@ -91,11 +114,17 @@ def follow_user_if_not_following(client, user_id):
     """Follow a user if not already following"""
     try:
         # Check if already following
-        client.follow_user(user_id)
+        client.follow(user_id)
         print(f"Successfully followed user ID: {user_id}")
         return True
     except tweepy.errors.Forbidden as e:
-        print(f"Already following or can't follow: {e}")
+        if "401" in str(e) or "unauthorized" in str(e).lower():
+            print(f"⚠️ Authentication error for follow operation - API credentials may lack write permissions")
+        else:
+            print(f"Already following or can't follow: {e}")
+        return False
+    except tweepy.errors.Unauthorized as e:
+        print(f"⚠️ Unauthorized to follow user - check API permissions")
         return False
     except Exception as e:
         print(f"Error following user: {e}")
@@ -119,7 +148,13 @@ def retweet_original(client, original_tweet_id):
         print(f"Successfully retweeted: {original_tweet_id}")
         return True
     except tweepy.errors.Forbidden as e:
-        print(f"Already retweeted or can't retweet: {e}")
+        if "401" in str(e) or "unauthorized" in str(e).lower():
+            print(f"⚠️ Authentication error for retweet - API credentials may lack write permissions")
+        else:
+            print(f"Already retweeted or can't retweet: {e}")
+        return False
+    except tweepy.errors.Unauthorized as e:
+        print(f"⚠️ Unauthorized to retweet - check API permissions")
         return False
     except Exception as e:
         print(f"Error retweeting: {e}")
@@ -129,13 +164,29 @@ def main():
     """Main bot loop"""
     print("Starting Twitter Quote Retweet Bot...")
     
+    print("⚠️  IMPORTANT: If you get 401 Unauthorized errors,")
+    print("   your Twitter API app needs 'Read + Write + DM' permissions")
+    print("   Visit: https://developer.twitter.com/ → Your App → Settings")
+    
+    # Validate environment variables
+    if not validate_credentials():
+        return
+    
+    print(f"🔍 Target account: @{TARGET_ACCOUNT}")
+    
     # Initialize API
-    client = initialize_api()
+    try:
+        client = initialize_api()
+        print("✅ API client initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize Twitter API: {e}")
+        return
     
     # Get target user ID
     user_id = get_user_id(client, TARGET_ACCOUNT)
     if not user_id:
-        print(f"Could not find user: {TARGET_ACCOUNT}")
+        print(f"❌ Could not find user: @{TARGET_ACCOUNT}")
+        print("Please check if the username is correct and the account exists.")
         return
     
     print(f"Monitoring @{TARGET_ACCOUNT} (ID: {user_id})")
@@ -182,17 +233,17 @@ def main():
             if not quote_tweets:
                 print("No new quote tweets to process")
             
-            # Wait before checking again (5 minutes)
-            print(f"Waiting 5 minutes before next check...")
-            time.sleep(300)
+            # Wait before checking again (15 minutes)
+            print(f"Waiting 15 minutes before next check...")
+            time.sleep(1500)
             
         except KeyboardInterrupt:
             print("\nBot stopped by user")
             break
         except Exception as e:
             print(f"Error in main loop: {e}")
-            print("Waiting 5 minutes before retrying...")
-            time.sleep(300)
+            print("Waiting 15 minutes before retrying...")
+            time.sleep(1500)
 
 if __name__ == "__main__":
     main()

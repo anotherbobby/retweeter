@@ -133,13 +133,14 @@ def follow_user_if_not_following(client, user_id):
 def get_tweet_author(client, tweet_id):
     """Get the author user ID of a tweet"""
     try:
-        tweet = client.get_tweet(tweet_id, expansions=['author_id'])
+        tweet = client.get_tweet(tweet_id, expansions=['author_id'], user_fields=['protected'])
         if tweet.data and tweet.includes and 'users' in tweet.includes:
-            return tweet.includes['users'][0].id
-        return None
+            author = tweet.includes['users'][0]
+            return author.id, author.protected
+        return None, None
     except Exception as e:
         print(f"Error getting tweet author: {e}")
-        return None
+        return None, None
 
 def retweet_original(client, original_tweet_id):
     """Retweet the original quoted tweet"""

@@ -110,37 +110,6 @@ def check_for_quote_tweets(client, user_id, processed_tweets):
         print(f"Error checking tweets: {e}")
         return []
 
-def follow_user_if_not_following(client, user_id):
-    """Follow a user if not already following"""
-    try:
-        # Check if already following
-        client.follow(user_id)
-        print(f"Successfully followed user ID: {user_id}")
-        return True
-    except tweepy.errors.Forbidden as e:
-        if "401" in str(e) or "unauthorized" in str(e).lower():
-            print(f"⚠️ Authentication error for follow operation - API credentials may lack write permissions")
-        else:
-            print(f"Already following or can't follow: {e}")
-        return False
-    except tweepy.errors.Unauthorized as e:
-        print(f"⚠️ Unauthorized to follow user - check API permissions")
-        return False
-    except Exception as e:
-        print(f"Error following user: {e}")
-        return False
-
-def get_tweet_author(client, tweet_id):
-    """Get the author user ID of a tweet"""
-    try:
-        tweet = client.get_tweet(tweet_id, expansions=['author_id'], user_fields=['protected'])
-        if tweet.data and tweet.includes and 'users' in tweet.includes:
-            author = tweet.includes['users'][0]
-            return author.id, author.protected
-        return None, None
-    except Exception as e:
-        print(f"Error getting tweet author: {e}")
-        return None, None
 
 def retweet_original(client, original_tweet_id):
     """Retweet the original quoted tweet"""
@@ -207,16 +176,7 @@ def main():
             # Process each quote tweet
             for qt in quote_tweets:
                 print(f"Processing quote tweet {qt['quote_tweet_id']}...")
-                
-                # Get the author of the original tweet
-                author_id = get_tweet_author(client, qt['original_tweet_id'])
-                
-                if author_id:
-                    # Follow the author if not already following
-                    print(f"Checking follow status for author {author_id}...")
-                    follow_user_if_not_following(client, author_id)
-                    time.sleep(1)  # Small delay after follow
-                
+
                 # Retweet the original
                 if retweet_original(client, qt['original_tweet_id']):
                     # Mark as processed
@@ -227,7 +187,7 @@ def main():
                     # Still mark as processed to avoid retrying
                     processed_tweets.add(qt['quote_tweet_id'])
                     save_processed_tweets(processed_tweets)
-                
+
                 # Small delay between retweets
                 time.sleep(2)
             
@@ -236,7 +196,7 @@ def main():
             
             # Wait before checking again (15 minutes)
             print(f"Waiting 15 minutes before next check...")
-            time.sleep(1500)
+            time.sleep(900)
             
         except KeyboardInterrupt:
             print("\nBot stopped by user")
@@ -244,7 +204,7 @@ def main():
         except Exception as e:
             print(f"Error in main loop: {e}")
             print("Waiting 15 minutes before retrying...")
-            time.sleep(1500)
+            time.sleep(900)
 
 if __name__ == "__main__":
     main()
